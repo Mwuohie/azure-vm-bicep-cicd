@@ -35,6 +35,32 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         name: 'subnet-vms'
         properties: {
           addressPrefix: '10.0.1.0/24'
+          networkSecurityGroup: {
+            id: nsg.id
+          }
+        }
+      }
+    ]
+  }
+}
+
+//============Network Security Group=========================
+resource nsg 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
+  name: 'nsg-vms'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'AllowRDP'
+        properties: {
+          priority: 100
+          protocol: 'Tcp'
+          access: 'Allow'
+          direction: 'Inbound'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '3389'
         }
       }
     ]
@@ -46,3 +72,4 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
 output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
 output vnetName string = vnet.name
+output nsgName string = nsg.name
