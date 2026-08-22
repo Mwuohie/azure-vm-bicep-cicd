@@ -67,9 +67,45 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
   }
 }
 
+//=========PUBLIC IP ADDRESS=========================
+resource publicIp 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
+  name: 'pip-vm-lab'
+  location: location
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+  sku: {
+    name: 'Standard'
+  }
+}
+
+//=========NETWORK INTERFACE=========================
+resource nic 'Microsoft.Network/networkInterfaces@2021-05-01' = {
+  name: 'nic-vm-lab'
+  location: location
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'ipconfig1'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          publicIPAddress: {
+            id: publicIp.id
+          }
+          subnet: {
+            id: '${vnet.id}/subnets/subnet-vms'
+          }
+        }
+      }
+    ]
+  }
+}
+
 
 //=============OUTPUTS=========================
 output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
 output vnetName string = vnet.name
 output nsgName string = nsg.name
+output publicIpAddress string = publicIp.properties.ipAddress
+output nicName string = nic.name
