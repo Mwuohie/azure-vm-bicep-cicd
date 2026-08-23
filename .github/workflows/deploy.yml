@@ -1,6 +1,11 @@
 name: Deploy Bicep to Azure
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '**.bicep'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
