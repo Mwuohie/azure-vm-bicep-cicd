@@ -1,22 +1,29 @@
 name: Deploy Bicep to Azure
+
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '**.bicep'
-      - '.github/workflows/**'
+    inputs:
+      action:
+        description: 'What to do'
+        required: true
+        default: 'validate'
+        type: choice
+        options:
+          - validate
+          - what-if
+          - deploy
+          - destroy
 
 permissions:
+  id-token: write
   contents: read
-  id-token: write 
 
-env: 
-  AZURE_RESOURCE_GROUP: "rg-bicep-cicd-lab"
-  AZURE_LOCATION: "australiaeast"
+env:
+  AZURE_RESOURCE_GROUP: rg-bicep-cicd-lab
+  AZURE_LOCATION: australiaeast
 
-jobs: 
-  deploy:
+jobs:
+  run-action:
     runs-on: ubuntu-latest
     environment: azure-lab
     steps:
@@ -30,22 +37,38 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Validate Bicep Template
+      - name: Validate Bicep template
+        if: inputs.action == 'validate'
         uses: azure/arm-deploy@v2
         with:
           scope: resourcegroup
           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./main.bicep
-          parameters: |
-            adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
+          parameters: adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
           deploymentMode: Validate
-          
-      - name: Deploy Bicep Template
+
+      - name: What-If Analysis
+        if: inputs.action == 'what-if'
         uses: azure/arm-deploy@v2
         with:
           scope: resourcegroup
           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./main.bicep
-          parameters: |
-            adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
+          parameters: adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
+          additionalArguments: "--what-if"
+
+      - name: Deploy Bicep template
+        if: inputs.action == 'deploy'
+        uses: azure/arm-deploy@v2
+        with:
+          scope: resourcegroup
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./main.bicep
+          parameters: adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
           failOnStdErr: false
+
+      - name: Destroy (delete resource group)
+        if: inputs.action == 'destroy'
+        run: |
+          az group delete --name ${{ env.AZURE_RESOURCE_GROUP }} --yes --no-wait
+          echo "Resource group deletion initiated (runs in background)"
