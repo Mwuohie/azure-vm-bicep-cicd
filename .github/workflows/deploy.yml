@@ -10,10 +10,10 @@ env:
   AZURE_RESOURCE_GROUP: "rg-bicep-cicd-lab"
   AZURE_LOCATION: "australiaeast"
 
-
 jobs: 
   deploy:
     runs-on: ubuntu-latest
+    environment: azure-lab
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
