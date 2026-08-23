@@ -1,19 +1,20 @@
 // ============================================================================
-// Bicep template: Windows VM with networking
-// Progressive build - currently: storage account + VNet + subnet
+// Main orchestrator
+// Deploys network module, then compute module, wiring outputs to inputs
 // ============================================================================
 
+// ---- INPUTS ----
 param location string = resourceGroup().location
 param storageAccountName string = 'stlab${uniqueString(resourceGroup().id)}'
+param adminUsername string = 'azureadminuser'
+@secure()
+param adminPassword string
 
-
-//=============STORAGE ACCOUNT=========================
+// ---- STORAGE ACCOUNT (kept inline, one-off) ----
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   name: storageAccountName
   location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
+  sku: { name: 'Standard_LRS' }
   kind: 'StorageV2'
   properties: {
     accessTier: 'Hot'
@@ -22,90 +23,28 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   }
 }
 
-//=============VNET and SUBNET=========================
-resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
-  name: 'vnet-lab'
-  location: location
-  properties: {
-    addressSpace: {
-      addressPrefixes: ['10.0.0.0/16']
-    }
-    subnets: [
-      {
-        name: 'subnet-vms'
-        properties: {
-          addressPrefix: '10.0.1.0/24'
-          networkSecurityGroup: {
-            id: nsg.id
-          }
-        }
-      }
-    ]
+// ---- NETWORK MODULE ----
+module network 'modules/network.bicep' = {
+  name: 'networkDeployment'
+  params: {
+    location: location
   }
 }
 
-//============Network Security Group=========================
-resource nsg 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
-  name: 'nsg-vms'
-  location: location
-  properties: {
-    securityRules: [
-      {
-        name: 'AllowRDP'
-        properties: {
-          priority: 100
-          protocol: 'Tcp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '3389'
-        }
-      }
-    ]
+// ---- COMPUTE MODULE ----
+module compute 'modules/compute.bicep' = {
+  name: 'computeDeployment'
+  params: {
+    location: location
+    subnetId: network.outputs.subnetId
+    adminUsername: adminUsername
+    adminPassword: adminPassword
   }
 }
 
-//=========PUBLIC IP ADDRESS=========================
-resource publicIp 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
-  name: 'pip-vm-lab'
-  location: location
-  properties: {
-    publicIPAllocationMethod: 'Static'
-  }
-  sku: {
-    name: 'Standard'
-  }
-}
-
-//=========NETWORK INTERFACE=========================
-resource nic 'Microsoft.Network/networkInterfaces@2021-05-01' = {
-  name: 'nic-vm-lab'
-  location: location
-  properties: {
-    ipConfigurations: [
-      {
-        name: 'ipconfig1'
-        properties: {
-          privateIPAllocationMethod: 'Dynamic'
-          publicIPAddress: {
-            id: publicIp.id
-          }
-          subnet: {
-            id: '${vnet.id}/subnets/subnet-vms'
-          }
-        }
-      }
-    ]
-  }
-}
-
-
-//=============OUTPUTS=========================
-output storageAccountId string = storageAccount.id
+// ---- OUTPUTS ----
 output storageAccountName string = storageAccount.name
-output vnetName string = vnet.name
-output nsgName string = nsg.name
-output publicIpAddress string = publicIp.properties.ipAddress
-output nicName string = nic.name
+output vnetName string = network.outputs.vnetName
+output vmName string = compute.outputs.vmName
+output publicIpAddress string = compute.outputs.publicIpAddress
+output rdpCommand string = 'mstsc /v:${compute.outputs.publicIpAddress}'
