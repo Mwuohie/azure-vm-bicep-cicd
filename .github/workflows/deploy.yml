@@ -1,0 +1,55 @@
+yaml
+
+name: Deploy Bicep to Azure
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write 
+
+env: 
+  Azure_Resource_Group: "rg-bicep-cicd-lab"
+  Azure_location: "australiaeast"
+
+
+jobs: 
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Bicep Template
+        uses: azure/arm-deploy@V2
+        with:
+          scope: resourceGroup
+          resource-group: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./main.bicep
+          parameters: |
+            adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
+          deployment-mode: Validate
+          
+      - name: Deploy Bicep Template
+        uses: azure/arm-deploy@V2
+        with:
+        scope: resourceGroup
+        resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+        template: ./main.bicep
+        parameters: |
+          adminPassword=${{ secrets.VM_ADMIN_PASSWORD }}
+        failonstderr: false
+
+
+       
